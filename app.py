@@ -10,6 +10,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from models import db, User, Asset, Transaction
 from forms import LoginForm, RegistrationForm, TransactionForm
 
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-super-secret-key-change-this-later')
 
