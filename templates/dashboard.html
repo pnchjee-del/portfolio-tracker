@@ -1,0 +1,578 @@
+{% extends "base.html" %}
+{% block content %}
+
+    {% set ns = namespace(total_invested=0, stocks_count=0, mf_count=0, bullion_count=0) %}
+    {% for name, data in portfolio.items() %}
+        {% set ns.total_invested = ns.total_invested + data.invested_value %}
+        {% if data.type == 'Stock' %}
+            {% set ns.stocks_count = ns.stocks_count + 1 %}
+        {% elif data.type == 'Mutual Fund' %}
+            {% set ns.mf_count = ns.mf_count + 1 %}
+        {% elif data.type == 'Bullion' %}
+            {% set ns.bullion_count = ns.bullion_count + 1 %}
+        {% endif %}
+    {% endfor %}
+
+    <style>
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        /* --- NSE / BSE Toggle Switch Styling --- */
+        .exchange-control {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 30px;
+            padding: 4px 6px 4px 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .exchange-control-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .switch-pills {
+            display: inline-flex;
+            background: #f1f5f9;
+            padding: 3px;
+            border-radius: 20px;
+            gap: 4px;
+        }
+
+        .switch-btn {
+            border: none;
+            background: transparent;
+            padding: 6px 14px;
+            border-radius: 16px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .switch-btn:hover:not(.active-nse):not(.active-bse) {
+            color: #1e293b;
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .switch-btn.active-nse {
+            background: #2563eb;
+            color: #ffffff;
+            box-shadow: 0 2px 10px rgba(37, 99, 235, 0.35);
+        }
+
+        .switch-btn.active-bse {
+            background: #dc2626;
+            color: #ffffff;
+            box-shadow: 0 2px 10px rgba(220, 38, 38, 0.35);
+        }
+
+        .dot-icon {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot-nse { background: #3b82f6; }
+        .dot-bse { background: #ef4444; }
+
+        .active-nse .dot-nse,
+        .active-bse .dot-bse {
+            background: #ffffff;
+        }
+
+        /* Metric Grid */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 18px;
+            margin-bottom: 28px;
+        }
+
+        .metric-card {
+            border-radius: var(--radius-md);
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .pnl-positive {
+            color: #15803d;
+            font-weight: 700;
+        }
+
+        .pnl-negative {
+            color: #b91c1c;
+            font-weight: 700;
+        }
+    </style>
+
+    <!-- Top Navigation Bar & Action Buttons -->
+    <div class="dashboard-header">
+        <div>
+            <h1 style="margin: 0; font-size: 1.75rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 10px;">
+                <span>💼</span> My Portfolio Overview
+            </h1>
+            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.95rem;">
+                Real-time tracking with live NSE &amp; BSE exchange switching.
+            </p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <!-- NSE / BSE Toggle Switch -->
+            <div class="exchange-control">
+                <span class="exchange-control-title">Exchange:</span>
+                <div class="switch-pills">
+                    <button type="button" class="switch-btn active-nse" id="btn-nse" onclick="switchExchange('NSE')">
+                        <span class="dot-icon dot-nse"></span> NSE
+                    </button>
+                    <button type="button" class="switch-btn" id="btn-bse" onclick="switchExchange('BSE')">
+                        <span class="dot-icon dot-bse"></span> BSE
+                    </button>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <a href="{{ url_for('download_report') }}" class="btn" style="background: var(--danger-gradient); color: white;">
+                📄 Export PDF
+            </a>
+            <a href="{{ url_for('add_transaction') }}" class="btn" style="background: var(--success-gradient); color: white;">
+                ➕ Add Transaction
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary Metrics Cards with Live Exchange Valuations -->
+    <div class="metric-grid">
+        
+        <!-- Total Invested Card -->
+        <div class="metric-card" style="background: linear-gradient(135deg, #eef2ff 0%, #ede9fe 100%); border: 1.5px solid #c7d2fe; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--primary-gradient); display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);">
+                💰
+            </div>
+            <div>
+                <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #4338ca;">Invested Capital</div>
+                <div style="font-size: 1.5rem; font-weight: 800; color: #1e1b4b; margin-top: 2px;">
+                    ₹ {{ "{:,.2f}".format(ns.total_invested) }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Market Value Card (Dynamic per Exchange) -->
+        <div class="metric-card" style="background: linear-gradient(135deg, #ecfeff 0%, #e0f2fe 100%); border: 1.5px solid #bae6fd; box-shadow: 0 4px 12px rgba(6, 182, 212, 0.08);">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: var(--cyan-gradient); display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; box-shadow: 0 4px 10px rgba(6, 182, 212, 0.3);">
+                📈
+            </div>
+            <div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #0369a1;">Current Value</span>
+                    <span id="market-val-tag" class="badge" style="background: #dbeafe; color: #1e40af; font-size: 0.65rem; padding: 2px 6px;">NSE</span>
+                </div>
+                <div id="card-current-value" style="font-size: 1.5rem; font-weight: 800; color: #0c4a6e; margin-top: 2px;">
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+        <!-- Unrealized P&L Card -->
+        <div class="metric-card" id="card-pnl-bg" style="background: #f8fafc; border: 1.5px solid var(--border-color); box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
+            <div id="card-pnl-icon" style="width: 48px; height: 48px; border-radius: 12px; background: #64748b; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white;">
+                ⚖️
+            </div>
+            <div>
+                <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #475569;">Unrealized P&amp;L</div>
+                <div id="card-pnl-value" style="font-size: 1.4rem; font-weight: 800; color: #1e293b; margin-top: 2px;">
+                    Calculating...
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Exchange Benchmark Card -->
+        <div class="metric-card" id="benchmark-card-bg" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1.5px solid #bfdbfe; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);">
+            <div id="benchmark-icon" style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); display: flex; align-items: center; justify-content: center; font-size: 22px; color: white; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);">
+                🏛️
+            </div>
+            <div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span id="benchmark-name" style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #1e40af;">NIFTY 50</span>
+                    <span id="benchmark-code-badge" class="badge badge-stock" style="font-size: 0.65rem; padding: 2px 6px;">NSE</span>
+                </div>
+                <div id="benchmark-price" style="font-size: 1.5rem; font-weight: 800; color: #1e3a8a; margin-top: 2px;">
+                    ₹ {{ "{:,.2f}".format(market_data.NSE.benchmark.price) if market_data and market_data.NSE else "22,421.95" }}
+                </div>
+                <div id="benchmark-secondary" style="font-size: 0.75rem; color: #3b82f6; font-weight: 600; margin-top: 3px;">
+                    Bank Nifty: ₹ {{ "{:,.2f}".format(market_data.NSE.secondary_index.price) if market_data and market_data.NSE and market_data.NSE.secondary_index else "54,450.75" }}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Holdings Table Section -->
+    <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+        <div style="background: #f8fafc; padding: 14px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 8px;">
+                    <span>📋</span> Portfolio Holdings
+                </h3>
+                <span class="badge" id="table-exchange-indicator" style="background: #dbeafe; color: #1e40af;">Valued on NSE</span>
+            </div>
+            <span style="font-size: 0.85rem; color: #64748b; font-weight: 500;">
+                {{ portfolio|length }} Active {% if portfolio|length == 1 %}Position{% else %}Positions{% endif %}
+            </span>
+        </div>
+
+        {% if portfolio %}
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.92rem;" id="holdings-table">
+                    <thead>
+                        <tr style="background-color: #f1f5f9; color: #475569; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                            <th style="padding: 12px 18px; border-bottom: 2px solid var(--border-color);">Asset</th>
+                            <th style="padding: 12px 18px; border-bottom: 2px solid var(--border-color);">Type</th>
+                            <th style="padding: 12px 18px; border-bottom: 2px solid var(--border-color); text-align: right;">Quantity</th>
+                            <th style="padding: 12px 18px; border-bottom: 2px solid var(--border-color); text-align: right;">Avg Cost (₹)</th>
+                            <th style="padding: 12px 18px; border-bottom: 2px solid var(--border-color); text-align: right;">
+                                <span id="col-market-price-header">Market Price (NSE)</span>
+                            </th>
+                            <th style="padding: 12px 18px; border-bottom: 2px solid var(--border-color); text-align: right;">Invested Capital</th>
+                            <th style="padding: 12px 18px; border-bottom: 2px solid var(--border-color); text-align: right;">Current Value</th>
+                            <th style="padding: 12px 18px; border-bottom: 2px solid var(--border-color); text-align: right;">P&amp;L Returns</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for name, data in portfolio.items() %}
+                        <tr class="portfolio-row"
+                            data-asset-name="{{ name }}"
+                            data-asset-type="{{ data.type }}"
+                            data-quantity="{{ data.quantity }}"
+                            data-invested="{{ data.invested_value }}"
+                            data-avg-price="{{ data.invested_value / data.quantity if data.quantity > 0 else 0 }}"
+                            style="border-bottom: 1px solid var(--border-color); transition: background-color 0.15s ease;"
+                            onmouseover="this.style.backgroundColor='#f8fafc'" 
+                            onmouseout="this.style.backgroundColor='transparent'">
+                            
+                            <!-- Asset Name with avatar -->
+                            <td style="padding: 12px 18px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); color: #4338ca; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.82rem;">
+                                        {{ name[:2] | upper }}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 700; color: #0f172a;">{{ name }}</div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Asset Category Badge -->
+                            <td style="padding: 12px 18px;">
+                                {% if data.type == 'Stock' %}
+                                    <span class="badge badge-stock">📈 Stock</span>
+                                {% elif data.type == 'Mutual Fund' %}
+                                    <span class="badge badge-mf">🌱 Mutual Fund</span>
+                                {% elif data.type == 'Bullion' %}
+                                    <span class="badge badge-bullion">🪙 Bullion</span>
+                                {% else %}
+                                    <span class="badge" style="background: #f1f5f9; color: #475569;">{{ data.type }}</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Quantity -->
+                            <td style="padding: 12px 18px; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #334155;">
+                                {{ "{:,.2f}".format(data.quantity) if data.quantity % 1 != 0 else "{:,.0f}".format(data.quantity) }}
+                            </td>
+
+                            <!-- Avg Cost Price -->
+                            <td style="padding: 12px 18px; text-align: right; font-family: 'JetBrains Mono', monospace; color: #64748b;">
+                                ₹ {{ "{:,.2f}".format(data.invested_value / data.quantity if data.quantity > 0 else 0) }}
+                            </td>
+
+                            <!-- Live Market Price (Dynamic) -->
+                            <td style="padding: 12px 18px; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700;" class="cell-live-price">
+                                —
+                            </td>
+
+                            <!-- Invested Capital -->
+                            <td style="padding: 12px 18px; text-align: right; font-family: 'JetBrains Mono', monospace; color: #334155;">
+                                ₹ {{ "{:,.2f}".format(data.invested_value) }}
+                            </td>
+
+                            <!-- Current Market Value (Dynamic) -->
+                            <td style="padding: 12px 18px; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #0f172a;" class="cell-current-val">
+                                —
+                            </td>
+
+                            <!-- Unrealized P&L Returns (Dynamic) -->
+                            <td style="padding: 12px 18px; text-align: right; font-family: 'JetBrains Mono', monospace;" class="cell-pnl">
+                                —
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div style="padding: 50px 20px; text-align: center;">
+                <div style="font-size: 3rem; margin-bottom: 12px;">🌱</div>
+                <h3 style="margin: 0 0 8px 0; color: #334155; font-size: 1.2rem;">Your portfolio is waiting for investments!</h3>
+                <p style="margin: 0 0 20px 0; color: #64748b; font-size: 0.95rem;">Start tracking by recording your first stock, mutual fund, or bullion purchase.</p>
+                <a href="{{ url_for('add_transaction') }}" class="btn" style="background: var(--success-gradient); color: white;">
+                    ➕ Log First Transaction
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Embedded Market Data JSON -->
+    <script id="market-data-payload" type="application/json">
+        {{ market_data | tojson | safe }}
+    </script>
+
+    <!-- Interactive Exchange Switching Logic -->
+    <script>
+        let marketData = {};
+        try {
+            const rawPayload = document.getElementById('market-data-payload').textContent;
+            marketData = JSON.parse(rawPayload);
+        } catch (e) {
+            console.error("Failed to parse market data:", e);
+        }
+
+        // Clean symbol helper (e.g. RELIANCE.NS -> RELIANCE)
+        function cleanSymbol(name) {
+            let s = name.toUpperCase().trim();
+            ['.NS', '.BO', '.BSE', '.NSE'].forEach(suffix => {
+                if (s.endsWith(suffix)) {
+                    s = s.slice(0, -suffix.length);
+                }
+            });
+            return s.trim();
+        }
+
+        function formatINR(number) {
+            return '₹ ' + Number(number).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function switchExchange(exchange) {
+            localStorage.setItem('preferredExchange', exchange);
+
+            const btnNSE = document.getElementById('btn-nse');
+            const btnBSE = document.getElementById('btn-bse');
+            const marketValTag = document.getElementById('market-val-tag');
+            const tableIndicator = document.getElementById('table-exchange-indicator');
+            const colHeader = document.getElementById('col-market-price-header');
+            const benchmarkBg = document.getElementById('benchmark-card-bg');
+            const benchmarkIcon = document.getElementById('benchmark-icon');
+            const benchmarkName = document.getElementById('benchmark-name');
+            const benchmarkCode = document.getElementById('benchmark-code-badge');
+            const benchmarkPrice = document.getElementById('benchmark-price');
+
+            // 1. Update Toggle Buttons Styling
+            if (exchange === 'NSE') {
+                btnNSE.className = 'switch-btn active-nse';
+                btnBSE.className = 'switch-btn';
+                if (marketValTag) {
+                    marketValTag.textContent = 'NSE';
+                    marketValTag.className = 'badge badge-stock';
+                }
+                if (tableIndicator) {
+                    tableIndicator.textContent = 'Valued on NSE';
+                    tableIndicator.className = 'badge badge-stock';
+                }
+                if (colHeader) colHeader.textContent = 'Market Price (NSE)';
+                
+                // Benchmark Card Update (NSE)
+                if (benchmarkBg) {
+                    benchmarkBg.style.background = 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)';
+                    benchmarkBg.style.borderColor = '#bfdbfe';
+                }
+                if (benchmarkIcon) {
+                    benchmarkIcon.style.background = 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+                }
+                if (benchmarkName) {
+                    benchmarkName.textContent = 'NIFTY 50';
+                    benchmarkName.style.color = '#1e40af';
+                }
+                if (benchmarkCode) {
+                    benchmarkCode.textContent = 'NSE';
+                    benchmarkCode.className = 'badge badge-stock';
+                }
+                if (benchmarkPrice && marketData.NSE) {
+                    benchmarkPrice.textContent = formatINR(marketData.NSE.benchmark.price);
+                    benchmarkPrice.style.color = '#1e3a8a';
+                }
+                const benchSec = document.getElementById('benchmark-secondary');
+                if (benchSec && marketData.NSE && marketData.NSE.secondary_index) {
+                    benchSec.textContent = 'Bank Nifty: ' + formatINR(marketData.NSE.secondary_index.price);
+                    benchSec.style.color = '#2563eb';
+                }
+
+            } else {
+                btnNSE.className = 'switch-btn';
+                btnBSE.className = 'switch-btn active-bse';
+                if (marketValTag) {
+                    marketValTag.textContent = 'BSE';
+                    marketValTag.className = 'badge badge-sell';
+                }
+                if (tableIndicator) {
+                    tableIndicator.textContent = 'Valued on BSE';
+                    tableIndicator.className = 'badge badge-sell';
+                }
+                if (colHeader) colHeader.textContent = 'Market Price (BSE)';
+
+                // Benchmark Card Update (BSE)
+                if (benchmarkBg) {
+                    benchmarkBg.style.background = 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)';
+                    benchmarkBg.style.borderColor = '#fecdd3';
+                }
+                if (benchmarkIcon) {
+                    benchmarkIcon.style.background = 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)';
+                }
+                if (benchmarkName) {
+                    benchmarkName.textContent = 'SENSEX';
+                    benchmarkName.style.color = '#9f1239';
+                }
+                if (benchmarkCode) {
+                    benchmarkCode.textContent = 'BSE';
+                    benchmarkCode.className = 'badge badge-sell';
+                }
+                if (benchmarkPrice && marketData.BSE) {
+                    benchmarkPrice.textContent = formatINR(marketData.BSE.benchmark.price);
+                    benchmarkPrice.style.color = '#881337';
+                }
+                const benchSec = document.getElementById('benchmark-secondary');
+                if (benchSec && marketData.BSE && marketData.BSE.secondary_index) {
+                    benchSec.textContent = 'BSE 100: ' + formatINR(marketData.BSE.secondary_index.price);
+                    benchSec.style.color = '#dc2626';
+                }
+            }
+
+            // 2. Recalculate Portfolio Values per row
+            const rows = document.querySelectorAll('.portfolio-row');
+            let totalInvested = 0;
+            let totalCurrentValue = 0;
+
+            const exchangePrices = (marketData[exchange] && marketData[exchange].prices) ? marketData[exchange].prices : {};
+
+            rows.forEach(row => {
+                const name = row.getAttribute('data-asset-name');
+                const type = row.getAttribute('data-asset-type');
+                const qty = parseFloat(row.getAttribute('data-quantity')) || 0;
+                const invested = parseFloat(row.getAttribute('data-invested')) || 0;
+                const avgPrice = parseFloat(row.getAttribute('data-avg-price')) || 0;
+                
+                totalInvested += invested;
+                const cleanKey = cleanSymbol(name);
+
+                let currentPrice = null;
+                if (type === 'Stock' && exchangePrices[cleanKey] !== undefined) {
+                    currentPrice = exchangePrices[cleanKey];
+                } else if (type === 'Stock' && exchangePrices[name.toUpperCase()] !== undefined) {
+                    currentPrice = exchangePrices[name.toUpperCase()];
+                }
+
+                const priceCell = row.querySelector('.cell-live-price');
+                const valCell = row.querySelector('.cell-current-val');
+                const pnlCell = row.querySelector('.cell-pnl');
+
+                if (currentPrice !== null) {
+                    const rowCurrentVal = qty * currentPrice;
+                    totalCurrentValue += rowCurrentVal;
+                    const rowPnl = rowCurrentVal - invested;
+                    const rowPnlPct = invested > 0 ? (rowPnl / invested) * 100 : 0;
+
+                    priceCell.textContent = formatINR(currentPrice);
+                    valCell.textContent = formatINR(rowCurrentVal);
+
+                    if (rowPnl >= 0) {
+                        pnlCell.innerHTML = `<span class="pnl-positive">+${formatINR(rowPnl)} (+${rowPnlPct.toFixed(2)}%)</span>`;
+                    } else {
+                        pnlCell.innerHTML = `<span class="pnl-negative">${formatINR(rowPnl)} (${rowPnlPct.toFixed(2)}%)</span>`;
+                    }
+                } else {
+                    // For Mutual Funds, Bullion or unlisted assets, fallback to book cost
+                    totalCurrentValue += invested;
+                    priceCell.textContent = formatINR(avgPrice) + ' (Book)';
+                    valCell.textContent = formatINR(invested);
+                    pnlCell.innerHTML = '<span style="color: #64748b;">— (Par)</span>';
+                }
+            });
+
+            // 3. Update Summary Cards
+            const cardCurrentVal = document.getElementById('card-current-value');
+            if (cardCurrentVal) {
+                cardCurrentVal.textContent = formatINR(totalCurrentValue);
+            }
+
+            const totalPnl = totalCurrentValue - totalInvested;
+            const totalPnlPct = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
+
+            const cardPnlBg = document.getElementById('card-pnl-bg');
+            const cardPnlIcon = document.getElementById('card-pnl-icon');
+            const cardPnlVal = document.getElementById('card-pnl-value');
+
+            if (cardPnlVal) {
+                if (totalPnl >= 0) {
+                    cardPnlVal.textContent = `+${formatINR(totalPnl)} (+${totalPnlPct.toFixed(2)}%)`;
+                    cardPnlVal.className = 'pnl-positive';
+                    if (cardPnlBg) {
+                        cardPnlBg.style.background = 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)';
+                        cardPnlBg.style.borderColor = '#bbf7d0';
+                    }
+                    if (cardPnlIcon) {
+                        cardPnlIcon.style.background = 'var(--success-gradient)';
+                        cardPnlIcon.textContent = '📈';
+                    }
+                } else {
+                    cardPnlVal.textContent = `${formatINR(totalPnl)} (${totalPnlPct.toFixed(2)}%)`;
+                    cardPnlVal.className = 'pnl-negative';
+                    if (cardPnlBg) {
+                        cardPnlBg.style.background = 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)';
+                        cardPnlBg.style.borderColor = '#fecdd3';
+                    }
+                    if (cardPnlIcon) {
+                        cardPnlIcon.style.background = 'var(--danger-gradient)';
+                        cardPnlIcon.textContent = '📉';
+                    }
+                }
+            }
+
+            // 4. Update the Top Ticker Ribbon
+            if (window.fetchTickerData) {
+                window.fetchTickerData(exchange);
+            }
+        }
+
+        // Initialize with user's preferred exchange or default to NSE
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedExchange = localStorage.getItem('preferredExchange') || 'NSE';
+            switchExchange(savedExchange);
+        });
+    </script>
+
+{% endblock %}

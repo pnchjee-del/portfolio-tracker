@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block content %}
+
+    {% set ns = namespace(total_debit=0, total_credit=0, buy_count=0, sell_count=0) %}
+    {% for t in transactions %}
+        {% set total = t.quantity * t.price_per_unit %}
+        {% if t.transaction_type == 'BUY' %}
+            {% set ns.total_debit = ns.total_debit + total %}
+            {% set ns.buy_count = ns.buy_count + 1 %}
+        {% else %}
+            {% set ns.total_credit = ns.total_credit + total %}
+            {% set ns.sell_count = ns.sell_count + 1 %}
+        {% endif %}
+    {% endfor %}
+
+    <!-- Header Section -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
+        <div>
+            <h1 style="margin: 0; font-size: 1.75rem; font-weight: 800; color: #0f172a; display: flex; align-items: center; gap: 10px;">
+                <span>📑</span> Transaction Ledger
+                <span class="badge" style="background: #e2e8f0; color: #475569; font-size: 0.8rem;">{{ transactions|length }} Records</span>
+            </h1>
+            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 0.95rem;">
+                A complete chronological audit trail of all buy orders and sell liquidations.
+            </p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('add_transaction') }}" class="btn" style="background: var(--success-gradient); color: white;">
+                ➕ New Transaction
+            </a>
+            <a href="{{ url_for('download_report') }}" class="btn" style="background: var(--danger-gradient); color: white;">
+                📄 Export PDF
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick Ledger Stats Pills -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 26px;">
+        <div style="background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: var(--radius-md); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: #166534;">Total Buy Transactions</div>
+                <div style="font-size: 1.25rem; font-weight: 800; color: #14532d; margin-top: 2px;">{{ ns.buy_count }} Orders</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.75rem; color: #166534; font-weight: 600;">Total Invested</div>
+                <div style="font-size: 1rem; font-weight: 700; color: #15803d; font-family: 'JetBrains Mono', monospace;">₹ {{ "{:,.2f}".format(ns.total_debit) }}</div>
+            </div>
+        </div>
+
+        <div style="background: #fff1f2; border: 1.5px solid #fecdd3; border-radius: var(--radius-md); padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: #9f1239;">Total Sell Liquidations</div>
+                <div style="font-size: 1.25rem; font-weight: 800; color: #881337; margin-top: 2px;">{{ ns.sell_count }} Orders</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.75rem; color: #9f1239; font-weight: 600;">Total Realized</div>
+                <div style="font-size: 1rem; font-weight: 700; color: #be123c; font-family: 'JetBrains Mono', monospace;">₹ {{ "{:,.2f}".format(ns.total_credit) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ledger Table -->
+    <div style="border: 1px solid var(--border-color); border-radius: var(--radius-md); overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.03);">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.92rem;">
+            <thead>
+                <tr style="background-color: #f1f5f9; color: #475569; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <th style="padding: 12px 16px; border-bottom: 2px solid var(--border-color);">Date</th>
+                    <th style="padding: 12px 16px; border-bottom: 2px solid var(--border-color);">Asset Name</th>
+                    <th style="padding: 12px 16px; border-bottom: 2px solid var(--border-color);">Type</th>
+                    <th style="padding: 12px 16px; border-bottom: 2px solid var(--border-color); text-align: center;">Action</th>
+                    <th style="padding: 12px 16px; border-bottom: 2px solid var(--border-color); text-align: right;">Quantity</th>
+                    <th style="padding: 12px 16px; border-bottom: 2px solid var(--border-color); text-align: right;">Price (₹)</th>
+                    <th style="padding: 12px 16px; border-bottom: 2px solid var(--border-color); text-align: right;">Debit (Invested)</th>
+                    <th style="padding: 12px 16px; border-bottom: 2px solid var(--border-color); text-align: right;">Credit (Realized)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr style="border-bottom: 1px solid var(--border-color); transition: background-color 0.15s ease;" onmouseover="this.style.backgroundColor='#f8fafc'" onmouseout="this.style.backgroundColor='transparent'">
+                    <!-- Date -->
+                    <td style="padding: 12px 16px; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; color: #64748b;">
+                        📅 {{ t.transaction_date.strftime('%Y-%m-%d') }}
+                    </td>
+                    
+                    <!-- Asset Name -->
+                    <td style="padding: 12px 16px;">
+                        <strong style="color: #0f172a;">{{ t.asset.name }}</strong>
+                    </td>
+
+                    <!-- Asset Type Badge -->
+                    <td style="padding: 12px 16px;">
+                        {% if t.asset.asset_type == 'Stock' %}
+                            <span class="badge badge-stock" style="font-size: 0.75rem;">Stock</span>
+                        {% elif t.asset.asset_type == 'Mutual Fund' %}
+                            <span class="badge badge-mf" style="font-size: 0.75rem;">Mutual Fund</span>
+                        {% elif t.asset.asset_type == 'Bullion' %}
+                            <span class="badge badge-bullion" style="font-size: 0.75rem;">Bullion</span>
+                        {% else %}
+                            <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 0.75rem;">{{ t.asset.asset_type }}</span>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Action Badge -->
+                    <td style="padding: 12px 16px; text-align: center;">
+                        {% if t.transaction_type == 'BUY' %}
+                            <span class="badge badge-buy">📥 BUY</span>
+                        {% else %}
+                            <span class="badge badge-sell">📤 SELL</span>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Quantity -->
+                    <td style="padding: 12px 16px; text-align: right; font-family: 'JetBrains Mono', monospace; color: #334155;">
+                        {{ "{:,.2f}".format(t.quantity) if t.quantity % 1 != 0 else "{:,.0f}".format(t.quantity) }}
+                    </td>
+
+                    <!-- Price -->
+                    <td style="padding: 12px 16px; text-align: right; font-family: 'JetBrains Mono', monospace; color: #334155;">
+                        ₹ {{ "{:,.2f}".format(t.price_per_unit) }}
+                    </td>
+                    
+                    <!-- Debit / Credit Columns -->
+                    {% set total = t.quantity * t.price_per_unit %}
+                    {% if t.transaction_type == 'BUY' %}
+                        <td style="padding: 12px 16px; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #e11d48;">
+                            ₹ {{ "{:,.2f}".format(total) }}
+                        </td>
+                        <td style="padding: 12px 16px; text-align: right; color: #cbd5e1;">—</td>
+                    {% else %}
+                        <td style="padding: 12px 16px; text-align: right; color: #cbd5e1;">—</td>
+                        <td style="padding: 12px 16px; text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #059669;">
+                            ₹ {{ "{:,.2f}".format(total) }}
+                        </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="padding: 40px; text-align: center; color: #64748b;">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">📭</div>
+                        No transaction history found yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+{% endblock %}

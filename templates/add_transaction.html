@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+    <div style="max-width: 600px; margin: 0 auto;">
+        
+        <!-- Top Accent & Card Header -->
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="width: 52px; height: 52px; margin: 0 auto 12px auto; border-radius: 14px; background: var(--success-gradient); display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); color: white;">
+                📝
+            </div>
+            <h2 style="margin: 0; font-size: 1.6rem; font-weight: 800; color: #0f172a;">
+                Log Transaction
+            </h2>
+            <p style="margin: 6px 0 0 0; color: #64748b; font-size: 0.95rem;">
+                Record a buy order or sell liquidation to update your portfolio.
+            </p>
+        </div>
+        
+        <div style="background: #ffffff; border: 1.5px solid var(--border-color); border-radius: var(--radius-lg); padding: 28px; box-shadow: var(--shadow-card);">
+            <form method="POST" action="">
+                {{ form.hidden_tag() }}
+                
+                <!-- Asset Name -->
+                <div>
+                    <label style="display: flex; align-items: center; gap: 6px;">
+                        <span>🏷️</span> {{ form.asset_name.label.text }}
+                    </label>
+                    {{ form.asset_name(placeholder="e.g., RELIANCE.NS, SBI Bluechip Fund, Gold 24K") }}
+                    {% for error in form.asset_name.errors %}
+                        <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Asset Type & Transaction Type Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 6px;">
+                            <span>📂</span> {{ form.asset_type.label.text }}
+                        </label>
+                        {{ form.asset_type() }}
+                        {% for error in form.asset_type.errors %}
+                            <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 6px;">
+                            <span>🔄</span> {{ form.transaction_type.label.text }}
+                        </label>
+                        {{ form.transaction_type() }}
+                        {% for error in form.transaction_type.errors %}
+                            <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Quantity & Price Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 6px;">
+                            <span>🔢</span> {{ form.quantity.label.text }}
+                        </label>
+                        {{ form.quantity(placeholder="e.g., 50", step="any") }}
+                        {% for error in form.quantity.errors %}
+                            <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <div>
+                        <label style="display: flex; align-items: center; gap: 6px;">
+                            <span>💵</span> {{ form.price_per_unit.label.text }}
+                        </label>
+                        {{ form.price_per_unit(placeholder="e.g., 1450.50", step="any") }}
+                        {% for error in form.price_per_unit.errors %}
+                            <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Transaction Date -->
+                <div>
+                    <label style="display: flex; align-items: center; gap: 6px;">
+                        <span>📅</span> {{ form.transaction_date.label.text }}
+                    </label>
+                    {{ form.transaction_date(type="date") }}
+                    {% for error in form.transaction_date.errors %}
+                        <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Submit Button -->
+                <div style="margin-top: 24px;">
+                    {{ form.submit(class="btn", style="width: 100%; background: var(--success-gradient); color: white; padding: 12px; font-size: 1rem; border-radius: var(--radius-md); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);") }}
+                </div>
+            </form>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center;">
+            <a href="{{ url_for('dashboard') }}" style="color: #6366f1; text-decoration: none; font-weight: 600; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 6px;">
+                ← Back to Dashboard
+            </a>
+        </div>
+    </div>
+{% endblock %}

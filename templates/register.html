@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block content %}
+    <div style="max-width: 440px; margin: 20px auto;">
+        
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="width: 56px; height: 56px; margin: 0 auto 12px auto; border-radius: 16px; background: var(--purple-gradient); display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4); color: white;">
+                ✨
+            </div>
+            <h2 style="margin: 0; font-size: 1.6rem; font-weight: 800; color: #0f172a;">
+                Create Your Account
+            </h2>
+            <p style="margin: 6px 0 0 0; color: #64748b; font-size: 0.95rem;">
+                Start tracking your assets and investment growth.
+            </p>
+        </div>
+
+        <div style="background: #ffffff; border: 1.5px solid var(--border-color); border-radius: var(--radius-lg); padding: 30px; box-shadow: var(--shadow-card);">
+            <form method="POST" action="">
+                {{ form.hidden_tag() }}
+                
+                <div>
+                    <label style="display: flex; align-items: center; gap: 6px;">
+                        <span>👤</span> {{ form.username.label.text }}
+                    </label>
+                    {{ form.username(placeholder="Choose a username") }}
+                    {% for error in form.username.errors %}
+                        <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    <label style="display: flex; align-items: center; gap: 6px;">
+                        <span>🔒</span> {{ form.password.label.text }}
+                    </label>
+                    {{ form.password(placeholder="Create a strong password") }}
+                    {% for error in form.password.errors %}
+                        <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    <label style="display: flex; align-items: center; gap: 6px;">
+                        <span>🔐</span> {{ form.confirm_password.label.text }}
+                    </label>
+                    {{ form.confirm_password(placeholder="Re-enter password") }}
+                    {% for error in form.confirm_password.errors %}
+                        <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div style="margin-top: 24px;">
+                    {{ form.submit(class="btn", style="width: 100%; background: var(--purple-gradient); color: white; padding: 12px; font-size: 1rem; border-radius: var(--radius-md); box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);") }}
+                </div>
+            </form>
+        </div>
+
+        <div style="margin-top: 22px; text-align: center; color: #64748b; font-size: 0.95rem;">
+            Already have an account? 
+            <a href="{{ url_for('login') }}" style="color: #7c3aed; text-decoration: none; font-weight: 700; margin-left: 4px;">
+                Sign in here →
+            </a>
+        </div>
+    </div>
+{% endblock %}

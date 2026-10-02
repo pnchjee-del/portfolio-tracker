@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Portfolio Report</title>
+    <style>
+        @page {
+            size: a4 portrait;
+            margin: 1.5cm;
+        }
+        body { font-family: Helvetica, Arial, sans-serif; color: #333; margin: 0; font-size: 11px; }
+        h1 { color: #111; text-align: center; font-size: 18px; margin-bottom: 5px; }
+        h2 { color: #222; font-size: 14px; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+        .header { border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 20px; }
+        .header p { margin: 3px 0; text-align: right; font-size: 11px; }
+        
+        table { width: 100%; margin-bottom: 25px; }
+        th, td { padding: 6px 8px; border: 1px solid #aaa; font-size: 10px; }
+        th { background-color: #f0f0f0; text-align: left; font-weight: bold; }
+        .right-align { text-align: right; }
+        .red { color: #d9534f; font-weight: bold; }
+        .green { color: #28a745; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Consolidated Portfolio &amp; Ledger Report</h1>
+        <p><strong>Account:</strong> {{ user.username }}</p>
+        <p><strong>Generated On:</strong> {{ date }}</p>
+    </div>
+
+    <h2>1. Current Holdings</h2>
+    {% if portfolio %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset Name</th>
+                    <th>Asset Type</th>
+                    <th class="right-align">Total Quantity</th>
+                    <th class="right-align">Total Invested Value (INR)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for name, data in portfolio.items() %}
+                <tr>
+                    <td><strong>{{ name }}</strong></td>
+                    <td>{{ data.type }}</td>
+                    <td class="right-align">{{ data.quantity }}</td>
+                    <td class="right-align">{{ "%.2f"|format(data.invested_value) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No active holdings currently found in portfolio.</p>
+    {% endif %}
+
+    <h2>2. Transaction Ledger</h2>
+    {% if transactions %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Asset Name</th>
+                    <th>Action</th>
+                    <th class="right-align">Qty</th>
+                    <th class="right-align">Price (INR)</th>
+                    <th class="right-align">Debit / Invested (INR)</th>
+                    <th class="right-align">Credit / Realized (INR)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr>
+                    <td>{{ t.transaction_date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ t.asset.name }}</td>
+                    <td class="{{ 'green' if t.transaction_type == 'BUY' else 'red' }}">
+                        {{ t.transaction_type }}
+                    </td>
+                    <td class="right-align">{{ t.quantity }}</td>
+                    <td class="right-align">{{ "%.2f"|format(t.price_per_unit) }}</td>
+                    
+                    {% set total = t.quantity * t.price_per_unit %}
+                    {% if t.transaction_type == 'BUY' %}
+                        <td class="right-align red">{{ "%.2f"|format(total) }}</td>
+                        <td class="right-align">-</td>
+                    {% else %}
+                        <td class="right-align">-</td>
+                        <td class="right-align green">{{ "%.2f"|format(total) }}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No transaction history found.</p>
+    {% endif %}
+
+</body>
+</html>
