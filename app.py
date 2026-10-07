@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
 from models import db, User, Asset, Transaction
-from forms import LoginForm, RegistrationForm, TransactionForm
+from forms import LoginForm, RegistrationForm, TransactionForm, ResetPasswordForm
 
 
 app = Flask(__name__)
@@ -323,6 +323,22 @@ def login():
         else:
             flash('Login Unsuccessful. Please check username and password.', 'danger')
     return render_template('login.html', form=form)
+
+@app.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data.strip()).first()
+        if user:
+            user.password_hash = generate_password_hash(form.new_password.data)
+            db.session.commit()
+            flash('Your password has been successfully reset! You can now log in.', 'success')
+            return redirect(url_for('login'))
+        else:
+            flash('No account found with that username. Please verify and try again.', 'danger')
+    return render_template('reset_password.html', form=form)
 
 @app.route('/logout')
 def logout():

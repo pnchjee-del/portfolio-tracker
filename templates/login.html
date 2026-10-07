@@ -30,9 +30,14 @@
                 </div>
 
                 <div>
-                    <label style="display: flex; align-items: center; gap: 6px;">
-                        <span>🔒</span> {{ form.password.label.text }}
-                    </label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <label style="display: flex; align-items: center; gap: 6px; margin: 0;">
+                            <span>🔒</span> {{ form.password.label.text }}
+                        </label>
+                        <a href="{{ url_for('reset_password') }}" style="color: #4f46e5; font-size: 0.85rem; text-decoration: none; font-weight: 600;">
+                            Forgot password?
+                        </a>
+                    </div>
                     {{ form.password(placeholder="Enter your password") }}
                     {% for error in form.password.errors %}
                         <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>

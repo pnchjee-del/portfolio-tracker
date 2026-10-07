@@ -21,3 +21,9 @@ class TransactionForm(FlaskForm):
     price_per_unit = FloatField('Price Per Unit', validators=[DataRequired(), NumberRange(min=0.0, message='Price cannot be negative')])
     transaction_date = DateField('Transaction Date', format='%Y-%m-%d', validators=[DataRequired()])
     submit = SubmitField('Log Transaction')
+
+class ResetPasswordForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=6, message='Password must be at least 6 characters')])
+    confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('new_password', message='Passwords must match')])
+    submit = SubmitField('Reset Password')
