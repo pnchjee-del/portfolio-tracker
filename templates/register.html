@@ -31,6 +31,16 @@
 
                 <div>
                     <label style="display: flex; align-items: center; gap: 6px;">
+                        <span>✉️</span> {{ form.email.label.text }}
+                    </label>
+                    {{ form.email(placeholder="Enter your email address") }}
+                    {% for error in form.email.errors %}
+                        <div style="color: #dc3545; font-size: 0.85rem; margin-top: 4px; font-weight: 600;">⚠️ {{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div>
+                    <label style="display: flex; align-items: center; gap: 6px;">
                         <span>🔒</span> {{ form.password.label.text }}
                     </label>
                     {{ form.password(placeholder="Create a strong password") }}

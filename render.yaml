@@ -12,3 +12,7 @@ services:
         generateValue: true
       - key: WEB_CONCURRENCY
         value: 1
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: onboarding@resend.dev

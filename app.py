@@ -2,13 +2,16 @@ import io
 import os
 import time
 from datetime import datetime
+import resend
+from itsdangerous import URLSafeTimedSerializer
 import yfinance as yf
 from flask import Flask, render_template, redirect, url_for, flash, request, jsonify, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from sqlalchemy import inspect, text
 
 from models import db, User, Asset, Transaction
-from forms import LoginForm, RegistrationForm, TransactionForm, ResetPasswordForm
+from forms import LoginForm, RegistrationForm, TransactionForm, RequestResetForm, ResetPasswordForm
 
 
 app = Flask(__name__)
@@ -24,6 +27,16 @@ db.init_app(app)
 
 with app.app_context():
     db.create_all()
+    try:
+        inspector = inspect(db.engine)
+        if 'user' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('user')]
+            if 'email' not in columns:
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE user ADD COLUMN email VARCHAR(120)"))
+                    conn.commit()
+    except Exception:
+        pass
 
 login_manager = LoginManager()
 login_manager.login_view = 'login'
@@ -33,6 +46,63 @@ login_manager.init_app(app)
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
+
+def get_reset_token(user_id, expires_sec=1800):
+    s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    return s.dumps({'user_id': user_id}, salt='password-reset-salt')
+
+def verify_reset_token(token, max_age=1800):
+    s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+    try:
+        data = s.loads(token, salt='password-reset-salt', max_age=max_age)
+        return db.session.get(User, data['user_id'])
+    except Exception:
+        return None
+
+def send_reset_email(user, token):
+    reset_url = url_for('reset_password_token', token=token, _external=True)
+    resend_api_key = os.environ.get('RESEND_API_KEY')
+    sender = os.environ.get('RESEND_FROM_EMAIL', 'Portfolio Tracker <onboarding@resend.dev>')
+    
+    subject = "Reset Your Portfolio Tracker Password"
+    html_content = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 14px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="width: 48px; height: 48px; line-height: 48px; margin: 0 auto 12px auto; border-radius: 12px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; font-size: 24px;">
+                🔑
+            </div>
+            <h2 style="color: #0f172a; margin: 0; font-size: 22px;">Password Reset Request</h2>
+            <p style="color: #64748b; font-size: 14px; margin-top: 6px;">Hi <strong>{user.username}</strong>, we received a request to reset your password.</p>
+        </div>
+        <div style="text-align: center; margin: 28px 0;">
+            <a href="{reset_url}" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px; display: inline-block;">Reset Password</a>
+        </div>
+        <p style="color: #64748b; font-size: 13px; line-height: 1.6;">This link is valid for <strong>30 minutes</strong>. If you did not make this request, you can safely ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="color: #94a3b8; font-size: 11px; word-break: break-all;">
+            If the button doesn't work, copy and paste this URL into your browser:<br/>
+            <a href="{reset_url}" style="color: #4f46e5;">{reset_url}</a>
+        </p>
+    </div>
+    """
+    
+    if not resend_api_key:
+        print(f"\n[DEV NOTICE] RESEND_API_KEY is not set. Reset link for {user.email}:\n{reset_url}\n")
+        return False, reset_url
+
+    try:
+        resend.api_key = resend_api_key
+        params = {
+            "from": sender,
+            "to": [user.email],
+            "subject": subject,
+            "html": html_content
+        }
+        resend.Emails.send(params)
+        return True, None
+    except Exception as e:
+        print(f"Resend sending error: {e}")
+        return False, reset_url
 
 def generate_pdf(html_string):
     """
@@ -294,13 +364,19 @@ def register():
         return redirect(url_for('dashboard'))
     form = RegistrationForm()
     if form.validate_on_submit():
-        existing_user = User.query.filter_by(username=form.username.data.strip()).first()
-        if existing_user:
+        username = form.username.data.strip()
+        email = form.email.data.strip().lower()
+        
+        if User.query.filter_by(username=username).first():
             flash('Username is already taken. Please choose a different one.', 'danger')
             return render_template('register.html', form=form)
             
+        if User.query.filter_by(email=email).first():
+            flash('An account with this email address already exists. Please log in.', 'danger')
+            return render_template('register.html', form=form)
+            
         hashed_password = generate_password_hash(form.password.data)
-        user = User(username=form.username.data.strip(), password_hash=hashed_password)
+        user = User(username=username, email=email, password_hash=hashed_password)
         db.session.add(user)
         db.session.commit()
         flash('Your account has been created! You can now log in.', 'success')
@@ -328,17 +404,53 @@ def login():
 def reset_password():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+    form = RequestResetForm()
+    if form.validate_on_submit():
+        input_val = form.email.data.strip()
+        user = User.query.filter(
+            (User.email == input_val.lower()) | (User.username == input_val)
+        ).first()
+
+        if user:
+            # If user has no email registered yet, but provided a valid email in the form, associate it
+            target_email = user.email or (input_val.lower() if '@' in input_val else None)
+            if not user.email and '@' in input_val:
+                user.email = input_val.lower()
+                db.session.commit()
+
+            if target_email:
+                token = get_reset_token(user.id)
+                sent, fallback_url = send_reset_email(user, token)
+                if sent:
+                    flash(f'A password reset link has been sent to {target_email} via Resend. Please check your inbox.', 'success')
+                else:
+                    if os.environ.get('RESEND_API_KEY'):
+                        flash('Failed to deliver email through Resend. Please check your Resend API configuration.', 'danger')
+                    else:
+                        flash(f'RESEND_API_KEY is not configured yet. Dev reset link: {fallback_url}', 'info')
+                return redirect(url_for('login'))
+            else:
+                flash('This account does not have an associated email address. Please contact support.', 'warning')
+        else:
+            flash('No account found with that email address or username.', 'danger')
+    return render_template('reset_request.html', form=form)
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password_token(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    user = verify_reset_token(token)
+    if not user:
+        flash('The password reset link is invalid or has expired (links expire after 30 minutes). Please request a new one.', 'warning')
+        return redirect(url_for('reset_password'))
+        
     form = ResetPasswordForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data.strip()).first()
-        if user:
-            user.password_hash = generate_password_hash(form.new_password.data)
-            db.session.commit()
-            flash('Your password has been successfully reset! You can now log in.', 'success')
-            return redirect(url_for('login'))
-        else:
-            flash('No account found with that username. Please verify and try again.', 'danger')
-    return render_template('reset_password.html', form=form)
+        user.password_hash = generate_password_hash(form.new_password.data)
+        db.session.commit()
+        flash('Your password has been successfully reset! You can now log in.', 'success')
+        return redirect(url_for('login'))
+    return render_template('reset_token.html', form=form)
 
 @app.route('/logout')
 def logout():

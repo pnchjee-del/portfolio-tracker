@@ -1,9 +1,10 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, SelectField, FloatField, DateField
-from wtforms.validators import DataRequired, Length, EqualTo, NumberRange
+from wtforms.validators import DataRequired, Length, EqualTo, NumberRange, Email
 
 class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=4, max=20)])
+    email = StringField('Email Address', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password', message='Passwords must match')])
     submit = SubmitField('Sign Up')
@@ -22,8 +23,11 @@ class TransactionForm(FlaskForm):
     transaction_date = DateField('Transaction Date', format='%Y-%m-%d', validators=[DataRequired()])
     submit = SubmitField('Log Transaction')
 
+class RequestResetForm(FlaskForm):
+    email = StringField('Email Address', validators=[DataRequired(), Email()])
+    submit = SubmitField('Send Reset Link')
+
 class ResetPasswordForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired()])
     new_password = PasswordField('New Password', validators=[DataRequired(), Length(min=6, message='Password must be at least 6 characters')])
     confirm_password = PasswordField('Confirm New Password', validators=[DataRequired(), EqualTo('new_password', message='Passwords must match')])
     submit = SubmitField('Reset Password')
